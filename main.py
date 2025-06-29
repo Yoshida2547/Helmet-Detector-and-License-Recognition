@@ -32,8 +32,18 @@ def handle_object_detection():
 
     tracker = solutions.TrackZone(
         region=region_points,
-        model=COCO_MODEL_PATH
+        model=COCO_MODEL_PATH,
+        classes=[3],
+        tracker='botsort.yaml',
+        conf=0.1,
+        verbose=False
     )
+
+    cross = 255
+
+    capture_line_point = [(0,cross), (width,cross)]
+
+    previous_boxes_dict = None
 
     # Loop through frames
     while True:
@@ -45,18 +55,36 @@ def handle_object_detection():
             print("End of video stream.")
             break
 
-        results = tracker(frame)
+        results = tracker.process(frame)
 
-        plot_frame = results.plot_im
+        plot_frame = results.plot_im # type: ignore
+
+        cv.line(plot_frame, capture_line_point[0], capture_line_point[1], color=(0, 255, 0), thickness=2) # type: ignore
 
         # Display the frame
         cv.imshow('Video Player', frame)
-        cv.imshow('Ploted', plot_frame)
+
+        current_boxes_dict = { id:box.numpy() for id, box in zip(tracker.track_ids, tracker.boxes)}
+
+        for id in list(current_boxes_dict.keys()):
+            if id not in previous_boxes_dict or previous_boxes_dict is None:
+                continue
+
+            current_box     = current_boxes_dict[id]
+            previous_box    = previous_boxes_dict[id]
+
+            x1, y1 = previous_box[:2]
+            x2, y2 = current_box[:2]
+
+            if y1 > cross and y2 < cross:
+                pass
 
         # Wait for a key press (1 millisecond delay)
         # Press 'q' to quit
         if cv.waitKey(1) & 0xFF == ord('q'):
             break
+
+        previous_boxes_dict = current_boxes_dict.copy()
 
     # Release the VideoCapture object and destroy all windows
     cap.release()

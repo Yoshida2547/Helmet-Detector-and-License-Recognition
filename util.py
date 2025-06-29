@@ -1,5 +1,5 @@
 LICENSE_PLATE_DETECTOR_MODEL_PATH = 'model/plate_detector.onnx'
-COCO_MODEL_PATH = 'model/yolo11m.pt'
+COCO_MODEL_PATH = 'model/yolo11s.pt'
 VIDEOS_PATH = [ 'videos/street_1.mp4',
                 'videos/street_2.mp4'
             ]
