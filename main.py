@@ -10,58 +10,57 @@ import cvzone
 
 import threading
 
-coco_model = YOLO(COCO_MODEL_PATH)
-plate_model = YOLO(LICENSE_PLATE_DETECTOR_MODEL_PATH)
-
-motorcycle_dict = {}
-motorcycle_conf_dict = {}
-
 def handle_object_detection():
 
-    for result in coco_model.track(source=VIDEOS_PATH[0], 
-                                   stream=True, 
-                                   conf=0.20, 
-                                   iou=0.1,
-                                   classes=[3, 2, 1, 0],
-                                   persist=True,
-                                   verbose=False,
-                                   ):
+    cap = cv.VideoCapture(VIDEOS_PATH[0]) 
 
-        origin_image = result.orig_img
-        ploted_image = result.plot()
+    # Check if the video file or camera was opened successfully
+    if not cap.isOpened():
+        print("Error: Could not open video.")
+        exit()
+    else:
+        width  = cap.get(cv.CAP_PROP_FRAME_WIDTH)   # float `width`
+        height = cap.get(cv.CAP_PROP_FRAME_HEIGHT)  # float `height`
 
-        cv.imshow('original frame', ploted_image)
+        width   = int(width)
+        height  = int(height)
 
-        boxes_motorcyle = [ box for box in result.boxes if result.names[int(box.cls)] == 'motorcycle'] # type: ignore
+    top_m,  bot_m   = (100, 100)
+    left_m, rigth_m = (100, 100)
 
-        for box in boxes_motorcyle:
+    region_points = [(left_m,top_m), (width-rigth_m, top_m), (width-rigth_m, height-bot_m), (left_m, height-bot_m)]
 
-            if box.id is None:
-                break
+    tracker = solutions.TrackZone(
+        region=region_points,
+        model=COCO_MODEL_PATH
+    )
 
-            #crop the motorcycle image
-            motor_bbox = box.xyxy.cpu().numpy()[0] # type: ignore
-            motor_id = int(box.id.cpu().numpy())
-            motor_conf = float(box.conf)
+    # Loop through frames
+    while True:
+        # Read a frame
+        ret, frame = cap.read()
 
-            crop_image = image_crop(origin_image, motor_bbox)
-
-            print(motor_id)
-
-            if motorcycle_dict.get(motor_id) is None:
-                motorcycle_dict[motor_id] = Motorcycle(motor_id, crop_image, box)
-                motorcycle_conf_dict[motor_id] = motor_conf
-
-            elif motorcycle_conf_dict[motor_id] < motor_conf:
-                motorcycle_dict[motor_id] = Motorcycle(motor_id, crop_image, box)
-                motorcycle_conf_dict[motor_id] = motor_conf
-
-        if cv.waitKey(25) & 0xFF ==  ord('q'):
+        # If the frame was not read successfully (end of video), break the loop
+        if not ret:
+            print("End of video stream.")
             break
-    
-    cv.destroyAllWindows()
 
-    return
+        results = tracker(frame)
+
+        plot_frame = results.plot_im
+
+        # Display the frame
+        cv.imshow('Video Player', frame)
+        cv.imshow('Ploted', plot_frame)
+
+        # Wait for a key press (1 millisecond delay)
+        # Press 'q' to quit
+        if cv.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    # Release the VideoCapture object and destroy all windows
+    cap.release()
+    cv.destroyAllWindows()
 
 def main():
     object_detection_handler = threading.Thread(target=handle_object_detection)
