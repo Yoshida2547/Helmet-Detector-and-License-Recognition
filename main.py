@@ -1,7 +1,6 @@
 from ultralytics import YOLO
 from ultralytics import solutions
 from util import *
-from keypoints import *
 
 import numpy as np
 
@@ -25,25 +24,25 @@ def handle_object_detection():
         width   = int(width)
         height  = int(height)
 
-    top_m,  bot_m   = (100, 100)
-    left_m, rigth_m = (100, 100)
+    top_m,  bot_m   = (0, 0)
+    left_m, rigth_m = (0, 0)
 
     region_points = [(left_m,top_m), (width-rigth_m, top_m), (width-rigth_m, height-bot_m), (left_m, height-bot_m)]
 
     tracker = solutions.TrackZone(
         region=region_points,
         model=COCO_MODEL_PATH,
-        classes=[3],
+        classes=[3, 0],
         tracker='botsort.yaml',
-        conf=0.1,
+        conf=0.25,
         verbose=False
     )
 
-    cross = 255
+    past_object_dict = None
 
-    capture_line_point = [(0,cross), (width,cross)]
+    capture_y = 300
 
-    previous_boxes_dict = None
+    print(tracker.names)
 
     # Loop through frames
     while True:
@@ -55,36 +54,62 @@ def handle_object_detection():
             print("End of video stream.")
             break
 
-        results = tracker.process(frame)
+        results = tracker.process(frame.copy())
 
         plot_frame = results.plot_im # type: ignore
 
-        cv.line(plot_frame, capture_line_point[0], capture_line_point[1], color=(0, 255, 0), thickness=2) # type: ignore
+        cv.line(plot_frame, (0, capture_y), (width, capture_y), color=(0,255,0), thickness=2) # type: ignore
 
-        # Display the frame
-        cv.imshow('Video Player', frame)
+        post_object_dict = {
+            id:{
+                'id':id,
+                'box':box.numpy(),
+                'cls':tracker.names[int(cls)],
+                'pos':box.numpy()[:2],
+                'conf':conf
+            }
 
-        current_boxes_dict = { id:box.numpy() for id, box in zip(tracker.track_ids, tracker.boxes)}
+            for id, box, cls, conf in zip(tracker.track_ids, tracker.boxes, tracker.clss, tracker.confs)
+        }
 
-        for id in list(current_boxes_dict.keys()):
-            if id not in previous_boxes_dict or previous_boxes_dict is None:
+        for post_object in post_object_dict.values():
+
+            if post_object['cls'] != 'motorcycle':
                 continue
 
-            current_box     = current_boxes_dict[id]
-            previous_box    = previous_boxes_dict[id]
+            if post_object['id'] not in past_object_dict or past_object_dict is None:
+                continue
 
-            x1, y1 = previous_box[:2]
-            x2, y2 = current_box[:2]
+            past_object = past_object_dict[post_object['id']]
 
-            if y1 > cross and y2 < cross:
+            post_pos = post_object['pos']
+            past_pos = past_object['pos']
+
+            if post_pos[1] < capture_y and past_pos[1] > capture_y:
+
+                bbox = post_object['box']
+
+                person = find_adjacent_object(post_object_dict, post_object, classes=['person'])
+
+                if person is not None:
+                    bbox = bbox_combine(bbox, person['box'])
+
+                image = image_crop(frame, bbox)
+
+                cv.imshow(f'{post_object['id']}', image)
+                print(post_object)
+
                 pass
+
+        past_object_dict = post_object_dict.copy()
+
+        # Display the frame
+        cv.imshow('Result', plot_frame) # type: ignore
 
         # Wait for a key press (1 millisecond delay)
         # Press 'q' to quit
         if cv.waitKey(1) & 0xFF == ord('q'):
             break
-
-        previous_boxes_dict = current_boxes_dict.copy()
 
     # Release the VideoCapture object and destroy all windows
     cap.release()
