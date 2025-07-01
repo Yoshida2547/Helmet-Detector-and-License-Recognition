@@ -5,6 +5,14 @@ VIDEOS_PATH = [ 'videos/street_1.mp4',
             ]
 CLASS_OF_INTEREST = [1,2,5,7]
 
+from ultralytics import YOLO
+
+license_detector_model = YOLO(LICENSE_PLATE_DETECTOR_MODEL_PATH)
+
+import easyocr
+
+reader = easyocr.Reader(["th"])
+
 def image_crop(origin_image, bbox):
 
     x1, y1, x2, y2 = bbox
@@ -52,4 +60,22 @@ def find_adjacent_object(object_dict, current_object, classes=None, min_iou=0.1)
     
     return None
 
+thai_consonants = [
+    'ก', 'ข', 'ฃ', 'ค', 'ฅ', 'ฆ', 'ง',
+    'จ', 'ฉ', 'ช', 'ซ', 'ฌ', 'ญ',
+    'ฎ', 'ฏ', 'ฐ', 'ฑ', 'ฒ', 'ณ',
+    'ด', 'ต', 'ถ', 'ท', 'ธ', 'น',
+    'บ', 'ป', 'ผ', 'ฝ', 'พ', 'ฟ', 'ภ', 'ม',
+    'ย', 'ร', 'ล', 'ว',
+    'ศ', 'ษ', 'ส', 'ห', 'ฬ', 'อ', 'ฮ'
+]
 
+def plate_numbers_clean(number):
+
+    number = number.replace(' ', '')
+
+    return list(filter(lambda x: x.isdigit() or x in thai_consonants, number))
+
+def get_plate_number_from_image(image):
+
+    return reader.readtext(image)

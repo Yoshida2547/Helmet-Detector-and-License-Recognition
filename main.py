@@ -94,10 +94,20 @@ def handle_object_detection():
                 if person is not None:
                     bbox = bbox_combine(bbox, person['box'])
 
-                image = image_crop(frame, bbox)
+                vehicle_image = image_crop(frame, bbox)
 
-                cv.imshow(f'{post_object['id']}', image)
-                print(post_object)
+                results = license_detector_model(vehicle_image)
+
+                license_plate_image = None
+
+                for box in results[0].boxes:
+
+                    if box.cls == 0:
+                        license_plate_image = image_crop(vehicle_image, box.xyxy.tolist()[0])
+
+                        print(get_plate_number_from_image(license_plate_image))
+
+                cv.imshow(f'{post_object['id']} result', results[0].plot())
 
                 pass
 
