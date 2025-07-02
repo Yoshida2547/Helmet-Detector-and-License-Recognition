@@ -8,7 +8,7 @@ Conda install guide can be found in https://www.anaconda.com/docs/getting-starte
 ## Cloning repo
 
 ```
-conda env create -f environment.yml
+git clone https://github.com/Yoshida2547/Helmet-Detector-and-License-Recognition.git
 ```
 
 ## Building envonment
